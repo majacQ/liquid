@@ -21,6 +21,11 @@ class VariableTest < Minitest::Test
     assert_equal('  worked wonderfully  ', template.render!('test' => 'worked wonderfully'))
   end
 
+  def test_expression_with_whitespace_in_square_brackets
+    assert_template_result('result', "{{ a[ 'b' ] }}", 'a' => { 'b' => 'result' })
+    assert_template_result('result', "{{ a[ [ 'b' ] ] }}", 'b' => 'c', 'a' => { 'c' => 'result' })
+  end
+
   def test_ignore_unknown
     template = Template.parse(%({{ test }}))
     assert_equal('', template.render!)
@@ -37,8 +42,8 @@ class VariableTest < Minitest::Test
   end
 
   def test_hash_scoping
-    template = Template.parse(%({{ test.test }}))
-    assert_equal('worked', template.render!('test' => { 'test' => 'worked' }))
+    assert_template_result('worked', "{{ test.test }}", 'test' => { 'test' => 'worked' })
+    assert_template_result('worked', "{{ test . test }}", 'test' => { 'test' => 'worked' })
   end
 
   def test_false_renders_as_false
@@ -94,5 +99,9 @@ class VariableTest < Minitest::Test
 
   def test_render_symbol
     assert_template_result('bar', '{{ foo }}', 'foo' => :bar)
+  end
+
+  def test_dynamic_find_var
+    assert_template_result('bar', '{{ [key] }}', 'key' => 'foo', 'foo' => 'bar')
   end
 end

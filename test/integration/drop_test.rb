@@ -49,10 +49,6 @@ class ProductDrop < Liquid::Drop
     ContextDrop.new
   end
 
-  def user_input
-    (+"foo").taint
-  end
-
   protected
 
   def callmenot
@@ -114,32 +110,6 @@ class DropsTest < Minitest::Test
     assert_equal('  ', tpl.render!('product' => ProductDrop.new))
   end
 
-  def test_rendering_raises_on_tainted_attr
-    with_taint_mode(:error) do
-      tpl = Liquid::Template.parse('{{ product.user_input }}')
-      assert_raises TaintedError do
-        tpl.render!('product' => ProductDrop.new)
-      end
-    end
-  end
-
-  def test_rendering_warns_on_tainted_attr
-    with_taint_mode(:warn) do
-      tpl     = Liquid::Template.parse('{{ product.user_input }}')
-      context = Context.new('product' => ProductDrop.new)
-      tpl.render!(context)
-      assert_equal [Liquid::TaintedError], context.warnings.map(&:class)
-      assert_equal "variable 'product.user_input' is tainted and was not escaped", context.warnings.first.to_s(false)
-    end
-  end
-
-  def test_rendering_doesnt_raise_on_escaped_tainted_attr
-    with_taint_mode(:error) do
-      tpl = Liquid::Template.parse('{{ product.user_input | escape }}')
-      tpl.render!('product' => ProductDrop.new)
-    end
-  end
-
   def test_drop_does_only_respond_to_whitelisted_methods
     assert_equal("", Liquid::Template.parse("{{ product.inspect }}").render!('product' => ProductDrop.new))
     assert_equal("", Liquid::Template.parse("{{ product.pretty_inspect }}").render!('product' => ProductDrop.new))
@@ -197,7 +167,7 @@ class DropsTest < Minitest::Test
   def test_object_methods_not_allowed
     [:dup, :clone, :singleton_class, :eval, :class_eval, :inspect].each do |method|
       output = Liquid::Template.parse(" {{ product.#{method} }} ").render!('product' => ProductDrop.new)
-      assert_equal '  ', output
+      assert_equal('  ', output)
     end
   end
 
@@ -240,28 +210,28 @@ class DropsTest < Minitest::Test
 
   def test_enumerable_drop_will_invoke_liquid_method_missing_for_clashing_method_names
     ["select", "each", "map", "cycle"].each do |method|
-      assert_equal method.to_s, Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new)
-      assert_equal method.to_s, Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new)
-      assert_equal method.to_s, Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new)
-      assert_equal method.to_s, Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new)
+      assert_equal(method.to_s, Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new))
+      assert_equal(method.to_s, Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new))
+      assert_equal(method.to_s, Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new))
+      assert_equal(method.to_s, Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new))
     end
   end
 
   def test_some_enumerable_methods_still_get_invoked
     [:count, :max].each do |method|
-      assert_equal "3", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new)
-      assert_equal "3", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new)
-      assert_equal "3", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new)
-      assert_equal "3", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new)
+      assert_equal("3", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new))
+      assert_equal("3", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new))
+      assert_equal("3", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new))
+      assert_equal("3", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new))
     end
 
     assert_equal("yes", Liquid::Template.parse("{% if collection contains 3 %}yes{% endif %}").render!('collection' => RealEnumerableDrop.new))
 
     [:min, :first].each do |method|
-      assert_equal "1", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new)
-      assert_equal "1", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new)
-      assert_equal "1", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new)
-      assert_equal "1", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new)
+      assert_equal("1", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => RealEnumerableDrop.new))
+      assert_equal("1", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => RealEnumerableDrop.new))
+      assert_equal("1", Liquid::Template.parse("{{collection.#{method}}}").render!('collection' => EnumerableDrop.new))
+      assert_equal("1", Liquid::Template.parse("{{collection[\"#{method}\"]}}").render!('collection' => EnumerableDrop.new))
     end
   end
 
@@ -279,7 +249,7 @@ class DropsTest < Minitest::Test
   end
 
   def test_invokable_methods
-    assert_equal(%w(to_liquid catchall user_input context texts).to_set, ProductDrop.invokable_methods)
+    assert_equal(%w(to_liquid catchall context texts).to_set, ProductDrop.invokable_methods)
     assert_equal(%w(to_liquid scopes_as_array loop_pos scopes).to_set, ContextDrop.invokable_methods)
     assert_equal(%w(to_liquid size max min first count).to_set, EnumerableDrop.invokable_methods)
     assert_equal(%w(to_liquid max min sort count first).to_set, RealEnumerableDrop.invokable_methods)

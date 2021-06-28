@@ -16,6 +16,8 @@ module Liquid
   #   {% include 'product' for products %}
   #
   class Include < Tag
+    prepend Tag::Disableable
+
     SYNTAX = /(#{QuotedFragment}+)(\s+(?:with|for)\s+(#{QuotedFragment}+))?(\s+(?:as)\s+(#{VariableSegment}+))?/o
 
     attr_reader :template_name_expr, :variable_name_expr, :attributes
@@ -29,12 +31,17 @@ module Liquid
         variable_name = Regexp.last_match(3)
 
         @alias_name         = Regexp.last_match(5)
-        @variable_name_expr = variable_name ? Expression.parse(variable_name) : nil
-        @template_name_expr = Expression.parse(template_name)
+        @variable_name_expr = variable_name ? parse_expression(variable_name) : nil
+        @template_name_expr = parse_expression(template_name)
         @attributes         = {}
 
+  <<<<<<< remove-extraneous-attributes-link-script
+        markup.scan(TagAttributes) do |key, value|
+          @attributes[key] = parse_expression(value)
+  =======
         markup.scan(TAG_ATTRIBUTES) do |key, value|
           @attributes[key] = Expression.parse(value)
+  >>>>>>> fix-constants
         end
 
       else

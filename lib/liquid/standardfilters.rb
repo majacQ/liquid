@@ -5,6 +5,7 @@ require 'bigdecimal'
 
 module Liquid
   module StandardFilters
+    MAX_INT = (1 << 31) - 1
     HTML_ESCAPE = {
       '&' => '&amp;',
       '>' => '&gt;',
@@ -41,7 +42,7 @@ module Liquid
     end
 
     def escape(input)
-      CGI.escapeHTML(input.to_s).untaint unless input.nil?
+      CGI.escapeHTML(input.to_s) unless input.nil?
     end
     alias_method :h, :escape
 
@@ -89,13 +90,21 @@ module Liquid
 
     def truncatewords(input, words = 15, truncate_string = "...")
       return if input.nil?
-      wordlist = input.to_s.split
-      words    = Utils.to_integer(words)
+      input = input.to_s
+      words = Utils.to_integer(words)
+      words = 1 if words <= 0
 
-      l = words - 1
-      l = 0 if l < 0
+      wordlist = begin
+        input.split(" ", words + 1)
+      rescue RangeError
+        raise if words + 1 < MAX_INT
+        # e.g. integer #{words} too big to convert to `int'
+        raise Liquid::ArgumentError, "integer #{words} too big for truncatewords"
+      end
+      return input if wordlist.length <= words
 
-      wordlist.length > l ? wordlist[0..l].join(" ").concat(truncate_string.to_s) : input
+      wordlist.pop
+      wordlist.join(" ").concat(truncate_string.to_s)
     end
 
     # Split input string into an array of substrings separated by given pattern.
@@ -295,7 +304,7 @@ module Liquid
 
     # Add <br /> tags in front of all newlines in input string
     def newline_to_br(input)
-      input.to_s.gsub(/\n/, "<br />\n")
+      input.to_s.gsub(/\r?\n/, "<br />\n")
     end
 
     # Reformat a date using Ruby's core Time#strftime( string ) -> string

@@ -54,28 +54,39 @@ module Minitest
       assert_match(match, exception.message)
     end
 
+    def assert_usage_increment(name, times: 1)
+      old_method = Liquid::Usage.method(:increment)
+      calls = 0
+      begin
+        Liquid::Usage.singleton_class.send(:remove_method, :increment)
+        Liquid::Usage.define_singleton_method(:increment) do |got_name|
+          calls += 1 if got_name == name
+          old_method.call(got_name)
+        end
+        yield
+      ensure
+        Liquid::Usage.singleton_class.send(:remove_method, :increment)
+        Liquid::Usage.define_singleton_method(:increment, old_method)
+      end
+      assert_equal(times, calls, "Number of calls to Usage.increment with #{name.inspect}")
+    end
+
     def with_global_filter(*globals)
-      original_global_strainer = Liquid::Strainer.class_variable_get(:@@global_strainer)
-      Liquid::Strainer.class_variable_set(:@@global_strainer, Class.new(Liquid::Strainer) do
-        @filter_methods = Set.new
-      end)
-      Liquid::Strainer.class_variable_get(:@@strainer_class_cache).clear
+      original_global_filters = Liquid::StrainerFactory.instance_variable_get(:@global_filters)
+      Liquid::StrainerFactory.instance_variable_set(:@global_filters, [])
+      globals.each do |global|
+        Liquid::StrainerFactory.add_global_filter(global)
+      end
+
+      Liquid::StrainerFactory.send(:strainer_class_cache).clear
 
       globals.each do |global|
         Liquid::Template.register_filter(global)
       end
       yield
     ensure
-      Liquid::Strainer.class_variable_get(:@@strainer_class_cache).clear
-      Liquid::Strainer.class_variable_set(:@@global_strainer, original_global_strainer)
-    end
-
-    def with_taint_mode(mode)
-      old_mode = Liquid::Template.taint_mode
-      Liquid::Template.taint_mode = mode
-      yield
-    ensure
-      Liquid::Template.taint_mode = old_mode
+      Liquid::StrainerFactory.send(:strainer_class_cache).clear
+      Liquid::StrainerFactory.instance_variable_set(:@global_filters, original_global_filters)
     end
 
     def with_error_mode(mode)
@@ -87,10 +98,17 @@ module Minitest
     end
 
     def with_custom_tag(tag_name, tag_class)
-      Liquid::Template.register_tag(tag_name, tag_class)
-      yield
-    ensure
-      Liquid::Template.tags.delete(tag_name)
+      old_tag = Liquid::Template.tags[tag_name]
+      begin
+        Liquid::Template.register_tag(tag_name, tag_class)
+        yield
+      ensure
+        if old_tag
+          Liquid::Template.tags[tag_name] = old_tag
+        else
+          Liquid::Template.tags.delete(tag_name)
+        end
+      end
     end
   end
 end
@@ -134,5 +152,18 @@ class StubFileSystem
   def read_template_file(template_path)
     @file_read_count += 1
     @values.fetch(template_path)
+  end
+end
+
+class StubTemplateFactory
+  attr_reader :count
+
+  def initialize
+    @count = 0
+  end
+
+  def for(_template_name)
+    @count += 1
+    Liquid::Template.new
   end
 end

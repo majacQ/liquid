@@ -24,8 +24,13 @@ module Liquid
       case markup
       when NAMED_SYNTAX
         @variables = variables_from_string(Regexp.last_match(2))
+  <<<<<<< remove-extraneous-attributes-link-script
+        @name      = parse_expression(Regexp.last_match(1))
+      when SimpleSyntax
+  =======
         @name      = Expression.parse(Regexp.last_match(1))
       when SIMPLE_SYNTAX
+  >>>>>>> fix-constants
         @variables = variables_from_string(markup)
         @name      = @variables.to_s
       else
@@ -60,8 +65,13 @@ module Liquid
 
     def variables_from_string(markup)
       markup.split(',').collect do |var|
+  <<<<<<< remove-extraneous-attributes-link-script
+        var =~ /\s*(#{QuotedFragment})\s*/o
+        Regexp.last_match(1) ? parse_expression(Regexp.last_match(1)) : nil
+  =======
         var =~ /\s*(#{QUOTED_FRAGMENT})\s*/o
         Regexp.last_match(1) ? Expression.parse(Regexp.last_match(1)) : nil
+  >>>>>>> fix-constants
       end.compact
     end
 

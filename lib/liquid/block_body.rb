@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'English'
+
 module Liquid
   class BlockBody
     LIQUID_TAG_TOKEN      = /\A\s*(\w+)\s*(.*?)\z/o
@@ -17,6 +19,8 @@ module Liquid
     end
 
     def parse(tokenizer, parse_context, &block)
+      raise FrozenError, "can't modify frozen Liquid::BlockBody" if frozen?
+
       parse_context.line_number = tokenizer.line_number
 
       if tokenizer.for_liquid_tag
@@ -24,6 +28,11 @@ module Liquid
       else
         parse_for_document(tokenizer, parse_context, &block)
       end
+    end
+
+    def freeze
+      @nodelist.freeze
+      super
     end
 
     private def parse_for_liquid_tag(tokenizer, parse_context)
@@ -51,27 +60,81 @@ module Liquid
       yield nil, nil
     end
 
-    private def parse_for_document(tokenizer, parse_context, &block)
+    # @api private
+    def self.unknown_tag_in_liquid_tag(tag, parse_context)
+      Block.raise_unknown_tag(tag, 'liquid', '%}', parse_context)
+    end
+
+    # @api private
+    def self.raise_missing_tag_terminator(token, parse_context)
+      raise SyntaxError, parse_context.locale.t("errors.syntax.tag_termination", token: token, tag_end: TagEnd.inspect)
+    end
+
+    # @api private
+    def self.raise_missing_variable_terminator(token, parse_context)
+      raise SyntaxError, parse_context.locale.t("errors.syntax.variable_termination", token: token, tag_end: VariableEnd.inspect)
+    end
+
+    # @api private
+    def self.render_node(context, output, node)
+      node.render_to_output_buffer(context, output)
+    rescue => exc
+      blank_tag = !node.instance_of?(Variable) && node.blank?
+      rescue_render_node(context, output, node.line_number, exc, blank_tag)
+    end
+
+    # @api private
+    def self.rescue_render_node(context, output, line_number, exc, blank_tag)
+      case exc
+      when MemoryError
+        raise
+      when UndefinedVariable, UndefinedDropMethod, UndefinedFilter
+        context.handle_error(exc, line_number)
+      else
+        error_message = context.handle_error(exc, line_number)
+        unless blank_tag # conditional for backwards compatibility
+          output << error_message
+        end
+      end
+    end
+
+    private def parse_liquid_tag(markup, parse_context)
+      liquid_tag_tokenizer = parse_context.new_tokenizer(
+        markup, start_line_number: parse_context.line_number, for_liquid_tag: true
+      )
+      parse_for_liquid_tag(liquid_tag_tokenizer, parse_context) do |end_tag_name, _end_tag_markup|
+        if end_tag_name
+          BlockBody.unknown_tag_in_liquid_tag(end_tag_name, parse_context)
+        end
+      end
+    end
+
+    private def parse_for_document(tokenizer, parse_context)
       while (token = tokenizer.shift)
         next if token.empty?
         case
         when token.start_with?(TAG_START_STRING)
           whitespace_handler(token, parse_context)
+  <<<<<<< remove-extraneous-attributes-link-script
+          unless token =~ FullToken
+            BlockBody.raise_missing_tag_terminator(token, parse_context)
+  =======
           unless token =~ FULL_TOKEN
             raise_missing_tag_terminator(token, parse_context)
+  >>>>>>> fix-constants
           end
           tag_name = Regexp.last_match(2)
           markup   = Regexp.last_match(4)
 
           if parse_context.line_number
-            # newlines inside the tag should increase the line number,
+            # newlines inside the tag must increase the line number,
             # particularly important for multiline {% liquid %} tags
             parse_context.line_number += Regexp.last_match(1).count("\n") + Regexp.last_match(3).count("\n")
           end
 
           if tag_name == 'liquid'
-            liquid_tag_tokenizer = Tokenizer.new(markup, line_number: parse_context.line_number, for_liquid_tag: true)
-            next parse_for_liquid_tag(liquid_tag_tokenizer, parse_context, &block)
+            parse_liquid_tag(markup, parse_context)
+            next
           end
 
           unless (tag = registered_tags[tag_name])
@@ -104,7 +167,11 @@ module Liquid
       if token[2] == WHITESPACE_CONTROL
         previous_token = @nodelist.last
         if previous_token.is_a?(String)
+          first_byte = previous_token.getbyte(0)
           previous_token.rstrip!
+          if previous_token.empty? && parse_context[:bug_compatible_whitespace_trimming] && first_byte
+            previous_token << first_byte
+          end
         end
       end
       parse_context.trim_whitespace = (token[-3] == WHITESPACE_CONTROL)
@@ -114,38 +181,49 @@ module Liquid
       @blank
     end
 
+    # Remove blank strings in the block body for a control flow tag (e.g. `if`, `for`, `case`, `unless`)
+    # with a blank body.
+    #
+    # For example, in a conditional assignment like the following
+    #
+    # ```
+    # {% if size > max_size %}
+    #   {% assign size = max_size %}
+    # {% endif %}
+    # ```
+    #
+    # we assume the intention wasn't to output the blank spaces in the `if` tag's block body, so this method
+    # will remove them to reduce the render output size.
+    #
+    # Note that it is now preferred to use the `liquid` tag for this use case.
+    def remove_blank_strings
+      raise "remove_blank_strings only support being called on a blank block body" unless @blank
+      @nodelist.reject! { |node| node.instance_of?(String) }
+    end
+
     def render(context)
       render_to_output_buffer(context, +'')
     end
 
     def render_to_output_buffer(context, output)
-      context.resource_limits.render_score += @nodelist.length
+      freeze unless frozen?
+
+      context.resource_limits.increment_render_score(@nodelist.length)
 
       idx = 0
       while (node = @nodelist[idx])
-        previous_output_size = output.bytesize
-
-        case node
-        when String
+        if node.instance_of?(String)
           output << node
-        when Variable
+        else
           render_node(context, output, node)
-        when Block
-          render_node(context, node.blank? ? +'' : output, node)
-          break if context.interrupt? # might have happened in a for-block
-        when Continue, Break
           # If we get an Interrupt that means the block must stop processing. An
           # Interrupt is any command that stops block execution such as {% break %}
-          # or {% continue %}
-          context.push_interrupt(node.interrupt)
-          break
-        else # Other non-Block tags
-          render_node(context, output, node)
-          break if context.interrupt? # might have happened through an include
+          # or {% continue %}. These tags may also occur through Block or Include tags.
+          break if context.interrupt? # might have happened in a for-block
         end
         idx += 1
 
-        raise_if_resource_limits_reached(context, output.bytesize - previous_output_size)
+        context.resource_limits.increment_write_score(output)
       end
 
       output
@@ -154,29 +232,7 @@ module Liquid
     private
 
     def render_node(context, output, node)
-      if node.disabled?(context)
-        output << node.disabled_error_message
-        return
-      end
-      disable_tags(context, node.disabled_tags) do
-        node.render_to_output_buffer(context, output)
-      end
-    rescue UndefinedVariable, UndefinedDropMethod, UndefinedFilter => e
-      context.handle_error(e, node.line_number)
-    rescue ::StandardError => e
-      line_number = node.is_a?(String) ? nil : node.line_number
-      output << context.handle_error(e, line_number)
-    end
-
-    def disable_tags(context, tags, &block)
-      return yield if tags.empty?
-      context.registers[:disabled_tags].disable(tags, &block)
-    end
-
-    def raise_if_resource_limits_reached(context, length)
-      context.resource_limits.render_length += length
-      return unless context.resource_limits.reached?
-      raise MemoryError, "Memory limits exceeded"
+      BlockBody.render_node(context, output, node)
     end
 
     def create_variable(token, parse_context)
@@ -184,15 +240,25 @@ module Liquid
         markup = content.first
         return Variable.new(markup, parse_context)
       end
-      raise_missing_variable_terminator(token, parse_context)
+      BlockBody.raise_missing_variable_terminator(token, parse_context)
     end
 
+    # @deprecated Use {.raise_missing_tag_terminator} instead
     def raise_missing_tag_terminator(token, parse_context)
+  <<<<<<< remove-extraneous-attributes-link-script
+      BlockBody.raise_missing_tag_terminator(token, parse_context)
+  =======
       raise SyntaxError, parse_context.locale.t("errors.syntax.tag_termination", token: token, tag_end: TAG_END.inspect)
+  >>>>>>> fix-constants
     end
 
+    # @deprecated Use {.raise_missing_variable_terminator} instead
     def raise_missing_variable_terminator(token, parse_context)
+  <<<<<<< remove-extraneous-attributes-link-script
+      BlockBody.raise_missing_variable_terminator(token, parse_context)
+  =======
       raise SyntaxError, parse_context.locale.t("errors.syntax.variable_termination", token: token, tag_end: VARIABLE_END.inspect)
+  >>>>>>> fix-constants
     end
 
     def registered_tags

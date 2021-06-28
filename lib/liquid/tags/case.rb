@@ -11,16 +11,29 @@ module Liquid
       super
       @blocks = []
 
+  <<<<<<< remove-extraneous-attributes-link-script
+      if markup =~ Syntax
+        @left = parse_expression(Regexp.last_match(1))
+  =======
       if markup =~ SYNTAX
         @left = Expression.parse(Regexp.last_match(1))
+  >>>>>>> fix-constants
       else
         raise SyntaxError, options[:locale].t("errors.syntax.case")
       end
     end
 
     def parse(tokens)
-      body = BlockBody.new
+      body = case_body = new_body
       body = @blocks.last.attachment while parse_body(body, tokens)
+      @blocks.reverse_each do |condition|
+        body = condition.attachment
+        unless body.frozen?
+          body.remove_blank_strings if blank?
+          body.freeze
+        end
+      end
+      case_body.freeze
     end
 
     def nodelist
@@ -56,7 +69,7 @@ module Liquid
     private
 
     def record_when_condition(markup)
-      body = BlockBody.new
+      body = new_body
 
       while markup
         unless markup =~ WHEN_SYNTAX
@@ -65,7 +78,7 @@ module Liquid
 
         markup = Regexp.last_match(2)
 
-        block = Condition.new(@left, '==', Expression.parse(Regexp.last_match(1)))
+        block = Condition.new(@left, '==', Condition.parse_expression(parse_context, Regexp.last_match(1)))
         block.attach(body)
         @blocks << block
       end
@@ -77,7 +90,7 @@ module Liquid
       end
 
       block = ElseCondition.new
-      block.attach(BlockBody.new)
+      block.attach(new_body)
       @blocks << block
     end
 

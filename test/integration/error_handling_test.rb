@@ -193,7 +193,7 @@ class ErrorHandlingTest < Minitest::Test
 
   # Liquid should not catch Exceptions that are not subclasses of StandardError, like Interrupt and NoMemoryError
   def test_exceptions_propagate
-    assert_raises Exception do
+    assert_raises(Exception) do
       template = Liquid::Template.parse('{{ errors.exception }}')
       template.render('errors' => ErrorDrop.new)
     end
@@ -260,5 +260,13 @@ class ErrorHandlingTest < Minitest::Test
     end
     assert_equal("Argument error:\nLiquid error (product line 1): argument error", page)
     assert_equal("product", template.errors.first.template_name)
+  end
+
+  def test_bug_compatible_silencing_of_errors_in_blank_nodes
+    output = Liquid::Template.parse("{% assign x = 0 %}{% if 1 < '2' %}not blank{% assign x = 3 %}{% endif %}{{ x }}").render
+    assert_equal("Liquid error: comparison of Integer with String failed0", output)
+
+    output = Liquid::Template.parse("{% assign x = 0 %}{% if 1 < '2' %}{% assign x = 3 %}{% endif %}{{ x }}").render
+    assert_equal("0", output)
   end
 end

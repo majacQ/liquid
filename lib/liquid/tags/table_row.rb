@@ -9,11 +9,11 @@ module Liquid
     def initialize(tag_name, markup, options)
       super
       if markup =~ Syntax
-        @variable_name = Regexp.last_match(1)
-        @collection_name = Expression.parse(Regexp.last_match(2))
-        @attributes = {}
+        @variable_name   = Regexp.last_match(1)
+        @collection_name = parse_expression(Regexp.last_match(2))
+        @attributes      = {}
         markup.scan(TagAttributes) do |key, value|
-          @attributes[key] = Expression.parse(value)
+          @attributes[key] = parse_expression(value)
         end
       else
         raise SyntaxError, options[:locale].t("errors.syntax.table_row")
@@ -24,11 +24,10 @@ module Liquid
       (collection = context.evaluate(@collection_name)) || (return '')
 
       from = @attributes.key?('offset') ? context.evaluate(@attributes['offset']).to_i : 0
-      to = @attributes.key?('limit') ? from + context.evaluate(@attributes['limit']).to_i : nil
+      to   = @attributes.key?('limit')  ? from + context.evaluate(@attributes['limit']).to_i : nil
 
       collection = Utils.slice_collection(collection, from, to)
-
-      length = collection.length
+      length     = collection.length
 
       cols = context.evaluate(@attributes['cols']).to_i
 

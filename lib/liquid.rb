@@ -42,6 +42,8 @@ module Liquid
   TemplateParser              = /(#{PartialTemplateParser}|#{AnyStartingTag})/om
   VariableParser              = /\[[^\]]+\]|#{VariableSegment}+\??/o
 
+  RAISE_EXCEPTION_LAMBDA = ->(_e) { raise }
+
   singleton_class.send(:attr_accessor, :cache_classes)
   self.cache_classes = true
 end
@@ -57,11 +59,14 @@ require 'liquid/forloop_drop'
 require 'liquid/extensions'
 require 'liquid/errors'
 require 'liquid/interrupts'
-require 'liquid/strainer'
+require 'liquid/strainer_factory'
+require 'liquid/strainer_template'
 require 'liquid/expression'
 require 'liquid/context'
 require 'liquid/parser_switching'
 require 'liquid/tag'
+require 'liquid/tag/disabler'
+require 'liquid/tag/disableable'
 require 'liquid/block'
 require 'liquid/block_body'
 require 'liquid/document'
@@ -80,8 +85,8 @@ require 'liquid/partial_cache'
 require 'liquid/usage'
 require 'liquid/register'
 require 'liquid/static_registers'
+require 'liquid/template_factory'
 
 # Load all the tags of the standard library
 #
 Dir["#{__dir__}/liquid/tags/*.rb"].each { |f| require f }
-Dir["#{__dir__}/liquid/registers/*.rb"].each { |f| require f }

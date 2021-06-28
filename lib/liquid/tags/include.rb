@@ -16,24 +16,28 @@ module Liquid
   #   {% include 'product' for products %}
   #
   class Include < Tag
-    Syntax = /(#{QuotedFragment}+)(\s+(?:with|for)\s+(#{QuotedFragment}+))?/o
+    prepend Tag::Disableable
+
+    SYNTAX = /(#{QuotedFragment}+)(\s+(?:with|for)\s+(#{QuotedFragment}+))?(\s+(?:as)\s+(#{VariableSegment}+))?/o
+    Syntax = SYNTAX
 
     attr_reader :template_name_expr, :variable_name_expr, :attributes
 
     def initialize(tag_name, markup, options)
       super
 
-      if markup =~ Syntax
+      if markup =~ SYNTAX
 
         template_name = Regexp.last_match(1)
         variable_name = Regexp.last_match(3)
 
-        @variable_name_expr = variable_name ? Expression.parse(variable_name) : nil
-        @template_name_expr = Expression.parse(template_name)
-        @attributes = {}
+        @alias_name         = Regexp.last_match(5)
+        @variable_name_expr = variable_name ? parse_expression(variable_name) : nil
+        @template_name_expr = parse_expression(template_name)
+        @attributes         = {}
 
         markup.scan(TagAttributes) do |key, value|
-          @attributes[key] = Expression.parse(value)
+          @attributes[key] = parse_expression(value)
         end
 
       else
@@ -54,7 +58,7 @@ module Liquid
         parse_context: parse_context
       )
 
-      context_variable_name = template_name.split('/').last
+      context_variable_name = @alias_name || template_name.split('/').last
 
       variable = if @variable_name_expr
         context.evaluate(@variable_name_expr)
@@ -63,10 +67,10 @@ module Liquid
       end
 
       old_template_name = context.template_name
-      old_partial = context.partial
+      old_partial       = context.partial
       begin
         context.template_name = template_name
-        context.partial = true
+        context.partial       = true
         context.stack do
           @attributes.each do |key, value|
             context[key] = context.evaluate(value)
@@ -84,7 +88,7 @@ module Liquid
         end
       ensure
         context.template_name = old_template_name
-        context.partial = old_partial
+        context.partial       = old_partial
       end
 
       output

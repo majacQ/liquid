@@ -27,18 +27,37 @@ module Liquid
       end,
     }
 
+    class MethodLiteral
+      attr_reader :method_name, :to_s
+
+      def initialize(method_name, to_s)
+        @method_name = method_name
+        @to_s = to_s
+      end
+    end
+
+    @@method_literals = {
+      'blank' => MethodLiteral.new(:blank?, '').freeze,
+      'empty' => MethodLiteral.new(:empty?, '').freeze,
+    }
+
     def self.operators
       @@operators
+    end
+
+    def self.parse_expression(parse_context, markup)
+      @@method_literals[markup] || parse_context.parse_expression(markup)
     end
 
     attr_reader :attachment, :child_condition
     attr_accessor :left, :operator, :right
 
     def initialize(left = nil, operator = nil, right = nil)
-      @left = left
+      @left     = left
       @operator = operator
-      @right = right
-      @child_relation = nil
+      @right    = right
+
+      @child_relation  = nil
       @child_condition = nil
     end
 
@@ -62,12 +81,12 @@ module Liquid
     end
 
     def or(condition)
-      @child_relation = :or
+      @child_relation  = :or
       @child_condition = condition
     end
 
     def and(condition)
-      @child_relation = :and
+      @child_relation  = :and
       @child_condition = condition
     end
 
@@ -90,7 +109,7 @@ module Liquid
     private
 
     def equal_variables(left, right)
-      if left.is_a?(Liquid::Expression::MethodLiteral)
+      if left.is_a?(MethodLiteral)
         if right.respond_to?(left.method_name)
           return right.send(left.method_name)
         else
@@ -98,7 +117,7 @@ module Liquid
         end
       end
 
-      if right.is_a?(Liquid::Expression::MethodLiteral)
+      if right.is_a?(MethodLiteral)
         if left.respond_to?(right.method_name)
           return left.send(right.method_name)
         else
@@ -115,7 +134,7 @@ module Liquid
       # return this as the result.
       return context.evaluate(left) if op.nil?
 
-      left = context.evaluate(left)
+      left  = context.evaluate(left)
       right = context.evaluate(right)
 
       operation = self.class.operators[op] || raise(Liquid::ArgumentError, "Unknown operator #{op}")

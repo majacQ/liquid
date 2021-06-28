@@ -8,6 +8,9 @@ class TestFileSystem
     when "product"
       "Product: {{ product.title }} "
 
+    when "product_alias"
+      "Product: {{ product.title }} "
+
     when "locale_variables"
       "Locale: {{echo1}} {{echo2}}"
 
@@ -51,7 +54,7 @@ class CountingFileSystem
   attr_reader :count
   def read_template_file(_template_path)
     @count ||= 0
-    @count += 1
+    @count  += 1
     'from CountingFileSystem'
   end
 end
@@ -89,6 +92,16 @@ class IncludeTagTest < Minitest::Test
   def test_include_tag_with
     assert_template_result("Product: Draft 151cm ",
       "{% include 'product' with products[0] %}", "products" => [{ 'title' => 'Draft 151cm' }, { 'title' => 'Element 155cm' }])
+  end
+
+  def test_include_tag_with_alias
+    assert_template_result("Product: Draft 151cm ",
+      "{% include 'product_alias' with products[0] as product %}", "products" => [{ 'title' => 'Draft 151cm' }, { 'title' => 'Element 155cm' }])
+  end
+
+  def test_include_tag_for_alias
+    assert_template_result("Product: Draft 151cm Product: Element 155cm ",
+      "{% include 'product_alias' for products as product %}", "products" => [{ 'title' => 'Draft 151cm' }, { 'title' => 'Element 155cm' }])
   end
 
   def test_include_tag_with_default_name
@@ -213,13 +226,13 @@ class IncludeTagTest < Minitest::Test
       Template.parse("{% include template %}", error_mode: :strict).render!("template" => '{{ "X" || downcase }}')
     end
     with_error_mode(:lax) do
-      assert_equal 'x', Template.parse("{% include template %}", error_mode: :strict, include_options_blacklist: true).render!("template" => '{{ "X" || downcase }}')
+      assert_equal('x', Template.parse("{% include template %}", error_mode: :strict, include_options_blacklist: true).render!("template" => '{{ "X" || downcase }}'))
     end
     assert_raises(Liquid::SyntaxError) do
       Template.parse("{% include template %}", error_mode: :strict, include_options_blacklist: [:locale]).render!("template" => '{{ "X" || downcase }}')
     end
     with_error_mode(:lax) do
-      assert_equal 'x', Template.parse("{% include template %}", error_mode: :strict, include_options_blacklist: [:error_mode]).render!("template" => '{{ "X" || downcase }}')
+      assert_equal('x', Template.parse("{% include template %}", error_mode: :strict, include_options_blacklist: [:error_mode]).render!("template" => '{{ "X" || downcase }}'))
     end
   end
 

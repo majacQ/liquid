@@ -12,7 +12,7 @@ module Liquid
 
     def self.slice_collection_using_each(collection, from, to)
       segments = []
-      index = 0
+      index    = 0
 
       # Maintains Ruby 1.8.7 String#each behaviour on 1.9
       if collection.is_a?(String)
@@ -80,6 +80,14 @@ module Liquid
       end
     rescue ::ArgumentError
       nil
+    end
+
+    def self.to_liquid_value(obj)
+      # Enable "obj" to represent itself as a primitive value like integer, string, or boolean
+      return obj.to_liquid_value if obj.respond_to?(:to_liquid_value)
+
+      # Otherwise return the object itself
+      obj
     end
   end
 end

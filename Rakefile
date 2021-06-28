@@ -9,9 +9,15 @@ task(default: [:test, :rubocop])
 
 desc('run test suite with default parser')
 Rake::TestTask.new(:base_test) do |t|
-  t.libs << '.' << 'lib' << 'test'
+  t.libs << 'lib' << 'test'
   t.test_files = FileList['test/{integration,unit}/**/*_test.rb']
-  t.verbose = false
+  t.verbose    = false
+end
+
+Rake::TestTask.new(:integration_test) do |t|
+  t.libs << 'lib' << 'test'
+  t.test_files = FileList['test/integration/**/*_test.rb']
+  t.verbose    = false
 end
 
 desc('run test suite with warn error mode')
@@ -40,12 +46,12 @@ task :test do
     ENV['LIQUID_C'] = '1'
 
     ENV['LIQUID_PARSER_MODE'] = 'lax'
-    Rake::Task['base_test'].reenable
-    Rake::Task['base_test'].invoke
+    Rake::Task['integration_test'].reenable
+    Rake::Task['integration_test'].invoke
 
     ENV['LIQUID_PARSER_MODE'] = 'strict'
-    Rake::Task['base_test'].reenable
-    Rake::Task['base_test'].invoke
+    Rake::Task['integration_test'].reenable
+    Rake::Task['integration_test'].invoke
   end
 end
 

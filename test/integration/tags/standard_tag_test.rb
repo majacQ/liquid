@@ -174,7 +174,7 @@ class StandardTagTest < Minitest::Test
 
   def test_assign_from_case
     # Example from the shopify forums
-    code = "{% case collection.handle %}{% when 'menswear-jackets' %}{% assign ptitle = 'menswear' %}{% when 'menswear-t-shirts' %}{% assign ptitle = 'menswear' %}{% else %}{% assign ptitle = 'womenswear' %}{% endcase %}{{ ptitle }}"
+    code     = "{% case collection.handle %}{% when 'menswear-jackets' %}{% assign ptitle = 'menswear' %}{% when 'menswear-t-shirts' %}{% assign ptitle = 'menswear' %}{% else %}{% assign ptitle = 'womenswear' %}{% endcase %}{{ ptitle }}"
     template = Liquid::Template.parse(code)
     assert_equal("menswear",   template.render!("collection" => { 'handle' => 'menswear-jackets' }))
     assert_equal("menswear",   template.render!("collection" => { 'handle' => 'menswear-t-shirts' }))
@@ -211,6 +211,11 @@ class StandardTagTest < Minitest::Test
     assert_template_result(' its 1 or 2 or 3 ', code, 'condition' => 'string')
     assert_template_result(' its 1 or 2 or 3 ', code, 'condition' => nil)
     assert_template_result('', code, 'condition' => 'something else')
+  end
+
+  def test_case_when_comma_and_blank_body
+    code = '{% case condition %}{% when 1, 2 %} {% assign r = "result" %} {% endcase %}{{ r }}'
+    assert_template_result('result', code, 'condition' => 2)
   end
 
   def test_assign

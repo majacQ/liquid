@@ -159,7 +159,7 @@ class StandardFiltersTest < Minitest::Test
     assert_equal('1', @filters.url_decode(1))
     assert_equal('2001-02-03', @filters.url_decode(Date.new(2001, 2, 3)))
     assert_nil(@filters.url_decode(nil))
-    exception = assert_raises Liquid::ArgumentError do
+    exception = assert_raises(Liquid::ArgumentError) do
       @filters.url_decode('%ff')
     end
     assert_equal('Liquid error: invalid byte sequence in UTF-8', exception.message)
@@ -171,10 +171,17 @@ class StandardFiltersTest < Minitest::Test
     assert_equal('one two three', @filters.truncatewords('one two three'))
     assert_equal(
       'Two small (13&#8221; x 5.5&#8221; x 10&#8221; high) baskets fit inside one large basket (13&#8221;...',
-        @filters.truncatewords('Two small (13&#8221; x 5.5&#8221; x 10&#8221; high) baskets fit inside one large basket (13&#8221; x 16&#8221; x 10.5&#8221; high) with cover.', 15)
+      @filters.truncatewords('Two small (13&#8221; x 5.5&#8221; x 10&#8221; high) baskets fit inside one large basket (13&#8221; x 16&#8221; x 10.5&#8221; high) with cover.', 15)
     )
     assert_equal("测试测试测试测试", @filters.truncatewords('测试测试测试测试', 5))
     assert_equal('one two1', @filters.truncatewords("one two three", 2, 1))
+    assert_equal('one two three...', @filters.truncatewords("one  two\tthree\nfour", 3))
+    assert_equal('one two...', @filters.truncatewords("one two three four", 2))
+    assert_equal('one...', @filters.truncatewords("one two three four", 0))
+    exception = assert_raises(Liquid::ArgumentError) do
+      @filters.truncatewords("one two three four", 1 << 31)
+    end
+    assert_equal("Liquid error: integer #{1 << 31} too big for truncatewords", exception.message)
   end
 
   def test_strip_html
@@ -207,7 +214,7 @@ class StandardFiltersTest < Minitest::Test
   end
 
   def test_sort_when_property_is_sometimes_missing_puts_nils_last
-    input = [
+    input       = [
       { "price" => 4, "handle" => "alpha" },
       { "handle" => "beta" },
       { "price" => 1, "handle" => "gamma" },
@@ -235,7 +242,7 @@ class StandardFiltersTest < Minitest::Test
   end
 
   def test_sort_natural_when_property_is_sometimes_missing_puts_nils_last
-    input = [
+    input       = [
       { "price" => "4", "handle" => "alpha" },
       { "handle" => "beta" },
       { "price" => "1", "handle" => "gamma" },
@@ -286,7 +293,7 @@ class StandardFiltersTest < Minitest::Test
       [3],
     ]
 
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.sort(foo, "bar")
     end
   end
@@ -302,7 +309,7 @@ class StandardFiltersTest < Minitest::Test
       [3],
     ]
 
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.sort_natural(foo, "bar")
     end
   end
@@ -337,7 +344,7 @@ class StandardFiltersTest < Minitest::Test
       [3],
     ]
 
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.uniq(foo, "bar")
     end
   end
@@ -353,7 +360,7 @@ class StandardFiltersTest < Minitest::Test
       [3],
     ]
 
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.compact(foo, "bar")
     end
   end
@@ -389,7 +396,7 @@ class StandardFiltersTest < Minitest::Test
 
   def test_legacy_map_on_hashes_with_dynamic_key
     template = "{% assign key = 'foo' %}{{ thing | map: key | map: 'bar' }}"
-    hash = { "foo" => { "bar" => 42 } }
+    hash     = { "foo" => { "bar" => 42 } }
     assert_template_result("42", template, "thing" => hash)
   end
 
@@ -400,8 +407,8 @@ class StandardFiltersTest < Minitest::Test
   end
 
   def test_map_over_proc
-    drop = TestDrop.new
-    p = proc { drop }
+    drop  = TestDrop.new
+    p     = proc { drop }
     templ = '{{ procs | map: "test" }}'
     assert_template_result("testfoo", templ, "procs" => [p])
   end
@@ -430,7 +437,7 @@ class StandardFiltersTest < Minitest::Test
       [3],
     ]
 
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.map(foo, "bar")
     end
   end
@@ -441,7 +448,7 @@ class StandardFiltersTest < Minitest::Test
       [2],
       [3],
     ]
-    assert_raises Liquid::ArgumentError do
+    assert_raises(Liquid::ArgumentError) do
       @filters.map(foo, nil)
     end
   end
@@ -485,8 +492,8 @@ class StandardFiltersTest < Minitest::Test
     assert_equal('', @filters.date('', "%B"))
 
     with_timezone("UTC") do
-      assert_equal "07/05/2006", @filters.date(1152098955, "%m/%d/%Y")
-      assert_equal "07/05/2006", @filters.date("1152098955", "%m/%d/%Y")
+      assert_equal("07/05/2006", @filters.date(1152098955, "%m/%d/%Y"))
+      assert_equal("07/05/2006", @filters.date("1152098955", "%m/%d/%Y"))
     end
   end
 
@@ -539,6 +546,7 @@ class StandardFiltersTest < Minitest::Test
 
   def test_newlines_to_br
     assert_template_result("a<br />\nb<br />\nc", "{{ source | newline_to_br }}", 'source' => "a\nb\nc")
+    assert_template_result("a<br />\nb<br />\nc", "{{ source | newline_to_br }}", 'source' => "a\r\nb\nc")
   end
 
   def test_plus
@@ -587,7 +595,7 @@ class StandardFiltersTest < Minitest::Test
 
     assert_template_result("0.5", "{{ 2.0 | divided_by:4 }}")
     assert_raises(Liquid::ZeroDivisionError) do
-      assert_template_result "4", "{{ 1 | modulo: 0 }}"
+      assert_template_result("4", "{{ 1 | modulo: 0 }}")
     end
 
     assert_template_result("5", "{{ price | divided_by:2 }}", 'price' => NumberLikeThing.new(10))
@@ -596,7 +604,7 @@ class StandardFiltersTest < Minitest::Test
   def test_modulo
     assert_template_result("1", "{{ 3 | modulo:2 }}")
     assert_raises(Liquid::ZeroDivisionError) do
-      assert_template_result "4", "{{ 1 | modulo: 0 }}"
+      assert_template_result("4", "{{ 1 | modulo: 0 }}")
     end
 
     assert_template_result("1", "{{ price | modulo:2 }}", 'price' => NumberLikeThing.new(3))
@@ -607,7 +615,7 @@ class StandardFiltersTest < Minitest::Test
     assert_template_result("4", "{{ '4.3' | round }}")
     assert_template_result("4.56", "{{ input | round: 2 }}", 'input' => 4.5612)
     assert_raises(Liquid::FloatDomainError) do
-      assert_template_result "4", "{{ 1.0 | divided_by: 0.0 | round }}"
+      assert_template_result("4", "{{ 1.0 | divided_by: 0.0 | round }}")
     end
 
     assert_template_result("5", "{{ price | round }}", 'price' => NumberLikeThing.new(4.6))
@@ -618,7 +626,7 @@ class StandardFiltersTest < Minitest::Test
     assert_template_result("5", "{{ input | ceil }}", 'input' => 4.6)
     assert_template_result("5", "{{ '4.3' | ceil }}")
     assert_raises(Liquid::FloatDomainError) do
-      assert_template_result "4", "{{ 1.0 | divided_by: 0.0 | ceil }}"
+      assert_template_result("4", "{{ 1.0 | divided_by: 0.0 | ceil }}")
     end
 
     assert_template_result("5", "{{ price | ceil }}", 'price' => NumberLikeThing.new(4.6))
@@ -628,7 +636,7 @@ class StandardFiltersTest < Minitest::Test
     assert_template_result("4", "{{ input | floor }}", 'input' => 4.6)
     assert_template_result("4", "{{ '4.3' | floor }}")
     assert_raises(Liquid::FloatDomainError) do
-      assert_template_result "4", "{{ 1.0 | divided_by: 0.0 | floor }}"
+      assert_template_result("4", "{{ 1.0 | divided_by: 0.0 | floor }}")
     end
 
     assert_template_result("5", "{{ price | floor }}", 'price' => NumberLikeThing.new(5.4))
@@ -685,6 +693,17 @@ class StandardFiltersTest < Minitest::Test
     assert_equal("bar", @filters.default(false, "bar"))
     assert_equal("bar", @filters.default([], "bar"))
     assert_equal("bar", @filters.default({}, "bar"))
+    assert_template_result('bar', "{{ false | default: 'bar' }}")
+  end
+
+  def test_default_handle_false
+    assert_equal("foo", @filters.default("foo", "bar", "allow_false" => true))
+    assert_equal("bar", @filters.default(nil, "bar", "allow_false" => true))
+    assert_equal("bar", @filters.default("", "bar", "allow_false" => true))
+    assert_equal(false, @filters.default(false, "bar", "allow_false" => true))
+    assert_equal("bar", @filters.default([], "bar", "allow_false" => true))
+    assert_equal("bar", @filters.default({}, "bar", "allow_false" => true))
+    assert_template_result('false', "{{ false | default: 'bar', allow_false: true }}")
   end
 
   def test_cannot_access_private_methods
@@ -757,6 +776,49 @@ class StandardFiltersTest < Minitest::Test
     assert_nil(@filters.where([nil], "ok"))
   end
 
+  def test_all_filters_never_raise_non_liquid_exception
+    test_drop = TestDrop.new
+    test_drop.context = Context.new
+    test_enum = TestEnumerable.new
+    test_enum.context = Context.new
+    test_types = [
+      "foo",
+      123,
+      0,
+      0.0,
+      -1234.003030303,
+      -99999999,
+      1234.38383000383830003838300,
+      nil,
+      true,
+      false,
+      TestThing.new,
+      test_drop,
+      test_enum,
+      ["foo", "bar"],
+      { "foo" => "bar" },
+      { foo: "bar" },
+      [{ "foo" => "bar" }, { "foo" => 123 }, { "foo" => nil }, { "foo" => true }, { "foo" => ["foo", "bar"] }],
+      { 1 => "bar" },
+      ["foo", 123, nil, true, false, Drop, ["foo"], { foo: "bar" }],
+    ]
+    test_types.each do |first|
+      test_types.each do |other|
+        (@filters.methods - Object.methods).each do |method|
+          arg_count = @filters.method(method).arity
+          arg_count *= -1 if arg_count < 0
+          inputs = [first]
+          inputs << ([other] * (arg_count - 1)) if arg_count > 1
+          begin
+            @filters.send(method, *inputs)
+          rescue Liquid::ArgumentError, Liquid::ZeroDivisionError
+            nil
+          end
+        end
+      end
+    end
+  end
+
   def test_where_no_target_value
     input = [
       { "foo" => false },
@@ -771,7 +833,7 @@ class StandardFiltersTest < Minitest::Test
   private
 
   def with_timezone(tz)
-    old_tz = ENV['TZ']
+    old_tz    = ENV['TZ']
     ENV['TZ'] = tz
     yield
   ensure

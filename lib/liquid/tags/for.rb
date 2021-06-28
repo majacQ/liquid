@@ -54,13 +54,20 @@ module Liquid
       super
       @from = @limit = nil
       parse_with_selected_parser(markup)
-      @for_block = BlockBody.new
+      @for_block = new_body
       @else_block = nil
     end
 
     def parse(tokens)
-      return unless parse_body(@for_block, tokens)
-      parse_body(@else_block, tokens)
+      if parse_body(@for_block, tokens)
+        parse_body(@else_block, tokens)
+      end
+      if blank?
+        @else_block&.remove_blank_strings
+        @for_block.remove_blank_strings
+      end
+      @else_block&.freeze
+      @for_block.freeze
     end
 
     def nodelist
@@ -69,7 +76,7 @@ module Liquid
 
     def unknown_tag(tag, markup, tokens)
       return super unless tag == 'else'
-      @else_block = BlockBody.new
+      @else_block = new_body
     end
 
     def render_to_output_buffer(context, output)
@@ -88,11 +95,11 @@ module Liquid
 
     def lax_parse(markup)
       if markup =~ Syntax
-        @variable_name = Regexp.last_match(1)
-        collection_name = Regexp.last_match(2)
-        @reversed = !!Regexp.last_match(3)
-        @name = "#{@variable_name}-#{collection_name}"
-        @collection_name = Expression.parse(collection_name)
+        @variable_name   = Regexp.last_match(1)
+        collection_name  = Regexp.last_match(2)
+        @reversed        = !!Regexp.last_match(3)
+        @name            = "#{@variable_name}-#{collection_name}"
+        @collection_name = parse_expression(collection_name)
         markup.scan(TagAttributes) do |key, value|
           set_attribute(key, value)
         end
@@ -105,9 +112,11 @@ module Liquid
       p = Parser.new(markup)
       @variable_name = p.consume(:id)
       raise SyntaxError, options[:locale].t("errors.syntax.for_invalid_in") unless p.id?('in')
-      collection_name = p.expression
-      @name = "#{@variable_name}-#{collection_name}"
-      @collection_name = Expression.parse(collection_name)
+
+      collection_name  = p.expression
+      @collection_name = parse_expression(collection_name)
+
+      @name     = "#{@variable_name}-#{collection_name}"
       @reversed = p.id?('reversed')
 
       while p.look(:id) && p.look(:colon, 1)
@@ -156,7 +165,7 @@ module Liquid
 
     def render_segment(context, output, segment)
       for_stack = context.registers[:for_stack] ||= []
-      length = segment.length
+      length    = segment.length
 
       context.stack do
         loop_vars = Liquid::ForloopDrop.new(@name, length, for_stack[-1])
@@ -189,12 +198,13 @@ module Liquid
       case key
       when 'offset'
         @from = if expr == 'continue'
+          Usage.increment('for_offset_continue')
           :continue
         else
-          Expression.parse(expr)
+          parse_expression(expr)
         end
       when 'limit'
-        @limit = Expression.parse(expr)
+        @limit = parse_expression(expr)
       end
     end
 

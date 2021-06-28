@@ -3,7 +3,7 @@
 module Liquid
   class VariableLookup
     SQUARE_BRACKETED = /\A\[(.*)\]\z/m
-    COMMAND_METHODS = ['size', 'first', 'last'].freeze
+    COMMAND_METHODS  = ['size', 'first', 'last'].freeze
 
     attr_reader :name, :lookups
 
@@ -20,7 +20,7 @@ module Liquid
       end
       @name = name
 
-      @lookups = lookups
+      @lookups       = lookups
       @command_flags = 0
 
       @lookups.each_index do |i|
@@ -34,11 +34,14 @@ module Liquid
     end
 
     def evaluate(context)
-      name = context.evaluate(@name)
+      name   = context.evaluate(@name)
       object = context.find_variable(name)
 
       @lookups.each_index do |i|
         key = context.evaluate(@lookups[i])
+
+        # Cast "key" to its liquid value to enable it to act as a primitive value
+        key = Liquid::Utils.to_liquid_value(key)
 
         # If object is a hash- or array-like object we look for the
         # presence of the key and if its available we return it
@@ -47,7 +50,7 @@ module Liquid
              (object.respond_to?(:fetch) && key.is_a?(Integer)))
 
           # if its a proc we will replace the entry with the proc
-          res = context.lookup_and_evaluate(object, key)
+          res    = context.lookup_and_evaluate(object, key)
           object = res.to_liquid
 
           # Some special cases. If the part wasn't in square brackets and

@@ -193,7 +193,7 @@ class ErrorHandlingTest < Minitest::Test
 
   # Liquid should not catch Exceptions that are not subclasses of StandardError, like Interrupt and NoMemoryError
   def test_exceptions_propagate
-    assert_raises Exception do
+    assert_raises(Exception) do
       template = Liquid::Template.parse('{{ errors.exception }}')
       template.render('errors' => ErrorDrop.new)
     end
@@ -226,9 +226,9 @@ class ErrorHandlingTest < Minitest::Test
   end
 
   def test_exception_renderer_exposing_non_liquid_error
-    template = Liquid::Template.parse('This is a runtime error: {{ errors.runtime_error }}', line_numbers: true)
+    template   = Liquid::Template.parse('This is a runtime error: {{ errors.runtime_error }}', line_numbers: true)
     exceptions = []
-    handler = ->(e) {
+    handler    = ->(e) {
       exceptions << e
       e.cause
     }
@@ -252,12 +252,21 @@ class ErrorHandlingTest < Minitest::Test
 
     begin
       Liquid::Template.file_system = TestFileSystem.new
+
       template = Liquid::Template.parse("Argument error:\n{% include 'product' %}", line_numbers: true)
-      page = template.render('errors' => ErrorDrop.new)
+      page     = template.render('errors' => ErrorDrop.new)
     ensure
       Liquid::Template.file_system = old_file_system
     end
     assert_equal("Argument error:\nLiquid error (product line 1): argument error", page)
     assert_equal("product", template.errors.first.template_name)
+  end
+
+  def test_bug_compatible_silencing_of_errors_in_blank_nodes
+    output = Liquid::Template.parse("{% assign x = 0 %}{% if 1 < '2' %}not blank{% assign x = 3 %}{% endif %}{{ x }}").render
+    assert_equal("Liquid error: comparison of Integer with String failed0", output)
+
+    output = Liquid::Template.parse("{% assign x = 0 %}{% if 1 < '2' %}{% assign x = 3 %}{% endif %}{{ x }}").render
+    assert_equal("0", output)
   end
 end

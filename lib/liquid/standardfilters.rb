@@ -5,6 +5,7 @@ require 'bigdecimal'
 
 module Liquid
   module StandardFilters
+    MAX_INT = (1 << 31) - 1
     HTML_ESCAPE = {
       '&' => '&amp;',
       '>' => '&gt;',
@@ -13,7 +14,7 @@ module Liquid
       "'" => '&#39;',
     }.freeze
     HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+));)/
-    STRIP_HTML_BLOCKS = Regexp.union(
+    STRIP_HTML_BLOCKS       = Regexp.union(
       %r{<script.*?</script>}m,
       /<!--.*?-->/m,
       %r{<style.*?</style>}m
@@ -41,7 +42,7 @@ module Liquid
     end
 
     def escape(input)
-      CGI.escapeHTML(input.to_s).untaint unless input.nil?
+      CGI.escapeHTML(input.to_s) unless input.nil?
     end
     alias_method :h, :escape
 
@@ -77,20 +78,33 @@ module Liquid
     def truncate(input, length = 50, truncate_string = "...")
       return if input.nil?
       input_str = input.to_s
-      length = Utils.to_integer(length)
+      length    = Utils.to_integer(length)
+
       truncate_string_str = truncate_string.to_s
+
       l = length - truncate_string_str.length
       l = 0 if l < 0
+
       input_str.length > length ? input_str[0...l].concat(truncate_string_str) : input_str
     end
 
     def truncatewords(input, words = 15, truncate_string = "...")
       return if input.nil?
-      wordlist = input.to_s.split
+      input = input.to_s
       words = Utils.to_integer(words)
-      l = words - 1
-      l = 0 if l < 0
-      wordlist.length > l ? wordlist[0..l].join(" ").concat(truncate_string.to_s) : input
+      words = 1 if words <= 0
+
+      wordlist = begin
+        input.split(" ", words + 1)
+      rescue RangeError
+        raise if words + 1 < MAX_INT
+        # e.g. integer #{words} too big to convert to `int'
+        raise Liquid::ArgumentError, "integer #{words} too big for truncatewords"
+      end
+      return input if wordlist.length <= words
+
+      wordlist.pop
+      wordlist.join(" ").concat(truncate_string.to_s)
     end
 
     # Split input string into an array of substrings separated by given pattern.
@@ -115,7 +129,7 @@ module Liquid
     end
 
     def strip_html(input)
-      empty = ''
+      empty  = ''
       result = input.to_s.gsub(STRIP_HTML_BLOCKS, empty)
       result.gsub!(STRIP_HTML_TAGS, empty)
       result
@@ -290,7 +304,7 @@ module Liquid
 
     # Add <br /> tags in front of all newlines in input string
     def newline_to_br(input)
-      input.to_s.gsub(/\n/, "<br />\n")
+      input.to_s.gsub(/\r?\n/, "<br />\n")
     end
 
     # Reformat a date using Ruby's core Time#strftime( string ) -> string
@@ -421,13 +435,20 @@ module Liquid
       result.is_a?(BigDecimal) ? result.to_f : result
     end
 
-    def default(input, default_value = '')
-      if !input || input.respond_to?(:empty?) && input.empty?
-        Usage.increment("default_filter_received_false_value") if input == false # See https://github.com/Shopify/liquid/issues/1127
-        default_value
-      else
-        input
-      end
+    # Set a default value when the input is nil, false or empty
+    #
+    # Example:
+    #    {{ product.title | default: "No Title" }}
+    #
+    # Use `allow_false` when an input should only be tested against nil or empty and not false.
+    #
+    # Example:
+    #    {{ product.title | default: "No Title", allow_false: true }}
+    #
+    def default(input, default_value = '', options = {})
+      options = {} unless options.is_a?(Hash)
+      false_check = options['allow_false'] ? input.nil? : !input
+      false_check || (input.respond_to?(:empty?) && input.empty?) ? default_value : input
     end
 
     private
@@ -464,7 +485,11 @@ module Liquid
 
       def initialize(input, context)
         @context = context
+  <<<<<<< to-raw-value
+        @input   = if input.is_a?(Array)
+  =======
         @input = if input.is_a?(Array)
+  >>>>>>> context-drop
           input.flatten
         elsif input.is_a?(Hash)
           [input]

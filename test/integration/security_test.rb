@@ -16,42 +16,49 @@ class SecurityTest < Minitest::Test
   end
 
   def test_no_instance_eval
-    text = %( {{ '1+1' | instance_eval }} )
+    text     = %( {{ '1+1' | instance_eval }} )
     expected = %( 1+1 )
 
     assert_equal(expected, Template.parse(text).render!(@assigns))
   end
 
   def test_no_existing_instance_eval
-    text = %( {{ '1+1' | __instance_eval__ }} )
+    text     = %( {{ '1+1' | __instance_eval__ }} )
     expected = %( 1+1 )
 
     assert_equal(expected, Template.parse(text).render!(@assigns))
   end
 
   def test_no_instance_eval_after_mixing_in_new_filter
-    text = %( {{ '1+1' | instance_eval }} )
+    text     = %( {{ '1+1' | instance_eval }} )
     expected = %( 1+1 )
 
     assert_equal(expected, Template.parse(text).render!(@assigns))
   end
 
   def test_no_instance_eval_later_in_chain
-    text = %( {{ '1+1' | add_one | instance_eval }} )
+    text     = %( {{ '1+1' | add_one | instance_eval }} )
     expected = %( 1+1 + 1 )
 
     assert_equal(expected, Template.parse(text).render!(@assigns, filters: SecurityFilter))
   end
 
-  def test_does_not_add_filters_to_symbol_table
+  def test_does_not_permanently_add_filters_to_symbol_table
     current_symbols = Symbol.all_symbols
 
-    test = %( {{ "some_string" | a_bad_filter }} )
+    # MRI imprecisely marks objects found on the C stack, which can result
+    # in uninitialized memory being marked. This can even result in the test failing
+    # deterministically for a given compilation of ruby. Using a separate thread will
+    # keep these writes of the symbol pointer on a separate stack that will be garbage
+    # collected after Thread#join.
+    Thread.new do
+      test = %( {{ "some_string" | a_bad_filter }} )
+      Template.parse(test).render!
+      nil
+    end.join
 
-    template = Template.parse(test)
-    assert_equal([], (Symbol.all_symbols - current_symbols))
+    GC.start
 
-    template.render!
     assert_equal([], (Symbol.all_symbols - current_symbols))
   end
 
@@ -68,13 +75,13 @@ class SecurityTest < Minitest::Test
 
   def test_max_depth_nested_blocks_does_not_raise_exception
     depth = Liquid::Block::MAX_DEPTH
-    code = "{% if true %}" * depth + "rendered" + "{% endif %}" * depth
+    code  = "{% if true %}" * depth + "rendered" + "{% endif %}" * depth
     assert_equal("rendered", Template.parse(code).render!)
   end
 
   def test_more_than_max_depth_nested_blocks_raises_exception
     depth = Liquid::Block::MAX_DEPTH + 1
-    code = "{% if true %}" * depth + "rendered" + "{% endif %}" * depth
+    code  = "{% if true %}" * depth + "rendered" + "{% endif %}" * depth
     assert_raises(Liquid::StackLevelError) do
       Template.parse(code).render!
     end

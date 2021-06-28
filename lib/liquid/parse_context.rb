@@ -7,9 +7,11 @@ module Liquid
 
     def initialize(options = {})
       @template_options = options ? options.dup : {}
-      @locale = @template_options[:locale] ||= I18n.new
+
+      @locale   = @template_options[:locale] ||= I18n.new
       @warnings = []
-      self.depth = 0
+
+      self.depth   = 0
       self.partial = false
     end
 
@@ -17,9 +19,22 @@ module Liquid
       @options[option_key]
     end
 
+    def new_block_body
+      Liquid::BlockBody.new
+    end
+
+    def new_tokenizer(markup, start_line_number: nil, for_liquid_tag: false)
+      Tokenizer.new(markup, line_number: start_line_number, for_liquid_tag: for_liquid_tag)
+    end
+
+    def parse_expression(markup)
+      Expression.parse(markup)
+    end
+
     def partial=(value)
       @partial = value
       @options = value ? partial_options : @template_options
+
       @error_mode = @options[:error_mode] || Template.error_mode
     end
 

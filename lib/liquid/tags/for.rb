@@ -62,12 +62,22 @@ module Liquid
       if parse_body(@for_block, tokens)
         parse_body(@else_block, tokens)
       end
+  <<<<<<< use-to-liquid-value-with-conditions
       if blank?
+  =======
+      @blank = @for_block.blank? && (@else_block.nil? || @else_block.blank?)
+      if @blank
+        @for_block.remove_blank_strings
+  >>>>>>> default-block-tag-blank-to-false
         @else_block&.remove_blank_strings
         @for_block.remove_blank_strings
       end
       @else_block&.freeze
       @for_block.freeze
+    end
+
+    def blank?
+      @blank
     end
 
     def nodelist

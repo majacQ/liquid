@@ -4,11 +4,6 @@ module Liquid
   class Block < Tag
     MAX_DEPTH = 100
 
-    def initialize(tag_name, markup, options)
-      super
-      @blank = true
-    end
-
     def parse(tokens)
       @body = new_body
       while parse_body(@body, tokens)
@@ -19,10 +14,6 @@ module Liquid
     # For backwards compatibility
     def render(context)
       @body.render(context)
-    end
-
-    def blank?
-      @blank
     end
 
     def nodelist
@@ -75,8 +66,6 @@ module Liquid
       parse_context.depth += 1
       begin
         body.parse(tokens, parse_context) do |end_tag_name, end_tag_params|
-          @blank &&= body.blank?
-
           return false if end_tag_name == block_delimiter
           raise_tag_never_closed(block_name) unless end_tag_name
 

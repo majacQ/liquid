@@ -21,14 +21,24 @@ module Liquid
     def parse(tokens)
       body = case_body = new_body
       body = @blocks.last.attachment while parse_body(body, tokens)
+  <<<<<<< use-to-liquid-value-with-conditions
       @blocks.reverse_each do |condition|
         body = condition.attachment
         unless body.frozen?
           body.remove_blank_strings if blank?
           body.freeze
         end
+  =======
+      @blank = @blocks.all? { |condition| condition.attachment.blank? }
+      if @blank
+        @blocks.each { |condition| condition.attachment.remove_blank_strings }
+  >>>>>>> default-block-tag-blank-to-false
       end
       case_body.freeze
+    end
+
+    def blank?
+      @blank
     end
 
     def nodelist

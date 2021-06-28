@@ -31,6 +31,7 @@ module Liquid
     def parse(tokens)
       while parse_body(@blocks.last.attachment, tokens)
       end
+  <<<<<<< use-to-liquid-value-with-conditions
       @blocks.reverse_each do |block|
         block.attachment.remove_blank_strings if blank?
         block.attachment.freeze
@@ -39,6 +40,17 @@ module Liquid
 
     ELSE_TAG_NAMES = ['elsif', 'else'].freeze
     private_constant :ELSE_TAG_NAMES
+  =======
+      @blank = @blocks.all? { |condition| condition.attachment.blank? }
+      if @blank
+        @blocks.each { |condition| condition.attachment.remove_blank_strings }
+      end
+    end
+
+    def blank?
+      @blank
+    end
+  >>>>>>> default-block-tag-blank-to-false
 
     def unknown_tag(tag, markup, tokens)
       if ELSE_TAG_NAMES.include?(tag)

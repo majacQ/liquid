@@ -106,12 +106,9 @@ module Liquid
     # Parse source code.
     # Returns self for easy chaining
     def parse(source, options = {})
-      @options      = options
-      @profiling    = options[:profile]
-      @line_numbers = options[:line_numbers] || @profiling
-      parse_context = options.is_a?(ParseContext) ? options : ParseContext.new(options)
-      @root         = Document.parse(tokenize(source), parse_context)
-      @warnings     = parse_context.warnings
+      parse_context = configure_options(options)
+      tokenizer     = parse_context.new_tokenizer(source, start_line_number: @line_numbers && 1)
+      @root         = Document.parse(tokenizer, parse_context)
       self
     end
 
@@ -153,7 +150,7 @@ module Liquid
         c = args.shift
 
         if @rethrow_errors
-          c.exception_renderer = ->(_e) { raise }
+          c.exception_renderer = Liquid::RAISE_EXCEPTION_LAMBDA
         end
 
         c
@@ -189,12 +186,13 @@ module Liquid
       # Retrying a render resets resource usage
       context.resource_limits.reset
 
+      if @profiling && context.profiler.nil?
+        @profiler = context.profiler = Liquid::Profiler.new
+      end
+
       begin
         # render the nodelist.
-        # for performance reasons we get an array back here. join will make a string out of it.
-        with_profiling(context) do
-          @root.render_to_output_buffer(context, output || +'')
-        end
+        @root.render_to_output_buffer(context, output || +'')
       rescue Liquid::MemoryError => e
         context.handle_error(e)
       ensure
@@ -213,25 +211,17 @@ module Liquid
 
     private
 
-    def tokenize(source)
-      Tokenizer.new(source, @line_numbers)
-    end
-
-    def with_profiling(context)
-      if @profiling && !context.partial
+    def configure_options(options)
+      if (profiling = options[:profile])
         raise "Profiler not loaded, require 'liquid/profiler' first" unless defined?(Liquid::Profiler)
-
-        @profiler = Profiler.new(context.template_name)
-        @profiler.start
-
-        begin
-          yield
-        ensure
-          @profiler.stop
-        end
-      else
-        yield
       end
+
+      @options      = options
+      @profiling    = profiling
+      @line_numbers = options[:line_numbers] || @profiling
+      parse_context = options.is_a?(ParseContext) ? options : ParseContext.new(options)
+      @warnings     = parse_context.warnings
+      parse_context
     end
 
     def apply_options_to_context(context, options)

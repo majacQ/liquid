@@ -12,19 +12,29 @@ module Liquid
       @blocks = []
 
       if markup =~ Syntax
-        @left = Expression.parse(Regexp.last_match(1))
+        @left = parse_expression(Regexp.last_match(1))
       else
         raise SyntaxError, options[:locale].t("errors.syntax.case")
       end
     end
 
     def parse(tokens)
-      body = BlockBody.new
+      body = case_body = new_body
       body = @blocks.last.attachment while parse_body(body, tokens)
+  <<<<<<< use-to-liquid-value-with-conditions
+      @blocks.reverse_each do |condition|
+        body = condition.attachment
+        unless body.frozen?
+          body.remove_blank_strings if blank?
+          body.freeze
+        end
+  =======
       @blank = @blocks.all? { |condition| condition.attachment.blank? }
       if @blank
         @blocks.each { |condition| condition.attachment.remove_blank_strings }
+  >>>>>>> default-block-tag-blank-to-false
       end
+      case_body.freeze
     end
 
     def blank?
@@ -52,7 +62,14 @@ module Liquid
       @blocks.each do |block|
         if block.else?
           block.attachment.render_to_output_buffer(context, output) if execute_else_block
-        elsif block.evaluate(context)
+          next
+        end
+
+        result = Liquid::Utils.to_liquid_value(
+          block.evaluate(context)
+        )
+
+        if result
           execute_else_block = false
           block.attachment.render_to_output_buffer(context, output)
         end
@@ -64,7 +81,7 @@ module Liquid
     private
 
     def record_when_condition(markup)
-      body = BlockBody.new
+      body = new_body
 
       while markup
         unless markup =~ WhenSyntax
@@ -73,7 +90,7 @@ module Liquid
 
         markup = Regexp.last_match(2)
 
-        block = Condition.new(@left, '==', Expression.parse(Regexp.last_match(1)))
+        block = Condition.new(@left, '==', Condition.parse_expression(parse_context, Regexp.last_match(1)))
         block.attach(body)
         @blocks << block
       end
@@ -85,7 +102,7 @@ module Liquid
       end
 
       block = ElseCondition.new
-      block.attach(BlockBody.new)
+      block.attach(new_body)
       @blocks << block
     end
 

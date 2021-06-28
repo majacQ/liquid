@@ -32,7 +32,7 @@ class ParsingQuirksTest < Minitest::Test
     assert(Template.parse("{{test}}"))
 
     with_error_mode(:lax) do
-      assert Template.parse("{{|test}}")
+      assert(Template.parse("{{|test}}"))
     end
 
     with_error_mode(:strict) do
@@ -116,6 +116,16 @@ class ParsingQuirksTest < Minitest::Test
     with_error_mode(:lax) do
       assert_template_result('12345', "{% for i in (1...5) %}{{ i }}{% endfor %}")
     end
+  end
+
+  def test_blank_variable_markup
+    assert_template_result('', "{{}}")
+  end
+
+  def test_lookup_on_var_with_literal_name
+    assigns = { "blank" => { "x" => "result" } }
+    assert_template_result('result', "{{ blank.x }}", assigns)
+    assert_template_result('result', "{{ blank['x'] }}", assigns)
   end
 
   def test_contains_in_id

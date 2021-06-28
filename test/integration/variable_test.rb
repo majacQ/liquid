@@ -15,10 +15,42 @@ class VariableTest < Minitest::Test
     assert_template_result('foobar', '{{ foo }}', 'foo' => ThingWithToLiquid.new)
   end
 
+  def test_variable_lookup_calls_to_liquid_value
+    assert_template_result('1', '{{ foo }}', 'foo' => IntegerDrop.new('1'))
+    assert_template_result('2', '{{ list[foo] }}', 'foo' => IntegerDrop.new('1'), 'list' => [1, 2, 3])
+    assert_template_result('one', '{{ list[foo] }}', 'foo' => IntegerDrop.new('1'), 'list' => { 1 => 'one' })
+    assert_template_result('Yay', '{{ foo }}', 'foo' => BooleanDrop.new(true))
+    assert_template_result('YAY', '{{ foo | upcase }}', 'foo' => BooleanDrop.new(true))
+  end
+
+  def test_if_tag_calls_to_liquid_value
+    assert_template_result('one', '{% if foo == 1 %}one{% endif %}', 'foo' => IntegerDrop.new('1'))
+    assert_template_result('one', '{% if 0 < foo %}one{% endif %}', 'foo' => IntegerDrop.new('1'))
+    assert_template_result('one', '{% if foo > 0 %}one{% endif %}', 'foo' => IntegerDrop.new('1'))
+    assert_template_result('true', '{% if foo == true %}true{% endif %}', 'foo' => BooleanDrop.new(true))
+    assert_template_result('true', '{% if foo %}true{% endif %}', 'foo' => BooleanDrop.new(true))
+
+    assert_template_result('', '{% if foo %}true{% endif %}', 'foo' => BooleanDrop.new(false))
+    assert_template_result('', '{% if foo == true %}True{% endif %}', 'foo' => BooleanDrop.new(false))
+  end
+
+  def test_unless_tag_calls_to_liquid_value
+    assert_template_result('', '{% unless foo %}true{% endunless %}', 'foo' => BooleanDrop.new(true))
+  end
+
+  def test_case_tag_calls_to_liquid_value
+    assert_template_result('One', '{% case foo %}{% when 1 %}One{% endcase %}', 'foo' => IntegerDrop.new('1'))
+  end
+
   def test_simple_with_whitespaces
     template = Template.parse(%(  {{ test }}  ))
     assert_equal('  worked  ', template.render!('test' => 'worked'))
     assert_equal('  worked wonderfully  ', template.render!('test' => 'worked wonderfully'))
+  end
+
+  def test_expression_with_whitespace_in_square_brackets
+    assert_template_result('result', "{{ a[ 'b' ] }}", 'a' => { 'b' => 'result' })
+    assert_template_result('result', "{{ a[ [ 'b' ] ] }}", 'b' => 'c', 'a' => { 'c' => 'result' })
   end
 
   def test_ignore_unknown
@@ -37,8 +69,8 @@ class VariableTest < Minitest::Test
   end
 
   def test_hash_scoping
-    template = Template.parse(%({{ test.test }}))
-    assert_equal('worked', template.render!('test' => { 'test' => 'worked' }))
+    assert_template_result('worked', "{{ test.test }}", 'test' => { 'test' => 'worked' })
+    assert_template_result('worked', "{{ test . test }}", 'test' => { 'test' => 'worked' })
   end
 
   def test_false_renders_as_false
@@ -94,5 +126,13 @@ class VariableTest < Minitest::Test
 
   def test_render_symbol
     assert_template_result('bar', '{{ foo }}', 'foo' => :bar)
+  end
+
+  def test_dynamic_find_var
+    assert_template_result('bar', '{{ [key] }}', 'key' => 'foo', 'foo' => 'bar')
+  end
+
+  def test_raw_value_variable
+    assert_template_result('bar', '{{ [key] }}', 'key' => 'foo', 'foo' => 'bar')
   end
 end

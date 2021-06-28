@@ -18,8 +18,8 @@ module Liquid
     attr_accessor :exception_renderer, :template_name, :partial, :global_filter, :strict_variables, :strict_filters
 
     # rubocop:disable Metrics/ParameterLists
-    def self.build(environments: {}, outer_scope: {}, registers: {}, rethrow_errors: false, resource_limits: nil, static_environments: {})
-      new(environments, outer_scope, registers, rethrow_errors, resource_limits, static_environments)
+    def self.build(environments: {}, outer_scope: {}, registers: {}, rethrow_errors: false, resource_limits: nil, static_environments: {}, &block)
+      new(environments, outer_scope, registers, rethrow_errors, resource_limits, static_environments, &block)
     end
 
     def initialize(environments = {}, outer_scope = {}, registers = {}, rethrow_errors = false, resource_limits = nil, static_environments = {})
@@ -34,17 +34,20 @@ module Liquid
       @strict_variables    = false
       @resource_limits     = resource_limits || ResourceLimits.new(Template.default_resource_limits)
       @base_scope_depth    = 0
-      squash_instance_assigns_with_environments
+      @interrupts          = []
+      @filters             = []
+      @global_filter       = nil
+      @disabled_tags       = {}
 
       self.exception_renderer = Template.default_exception_renderer
       if rethrow_errors
-        self.exception_renderer = ->(_e) { raise }
+        self.exception_renderer = Liquid::RAISE_EXCEPTION_LAMBDA
       end
 
-      @interrupts    = []
-      @filters       = []
-      @global_filter = nil
-      @disabled_tags = {}
+      yield self if block_given?
+
+      # Do this last, since it could result in this object being passed to a Proc in the environment
+      squash_instance_assigns_with_environments
     end
     # rubocop:enable Metrics/ParameterLists
 
@@ -134,7 +137,7 @@ module Liquid
     def new_isolated_subcontext
       check_overflow
 
-      Context.build(
+      self.class.build(
         resource_limits: resource_limits,
         static_environments: static_environments,
         registers: StaticRegisters.new(registers)

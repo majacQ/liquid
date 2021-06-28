@@ -153,6 +153,15 @@ class FiltersTest < Minitest::Test
     # tap still treated as a non-existent filter
     assert_equal("1000", Template.parse("{{var | tap}}").render!('var' => 1000))
   end
+
+  def test_liquid_argument_error
+    source = "{{ '' | size: 'too many args' }}"
+    exc = assert_raises(Liquid::ArgumentError) do
+      Template.parse(source).render!
+    end
+    assert_match(/\ALiquid error: wrong number of arguments /, exc.message)
+    assert_equal(exc.message, Template.parse(source).render)
+  end
 end
 
 class FiltersInTemplate < Minitest::Test
@@ -160,9 +169,9 @@ class FiltersInTemplate < Minitest::Test
 
   def test_local_global
     with_global_filter(MoneyFilter) do
-      assert_equal " 1000$ ", Template.parse("{{1000 | money}}").render!(nil, nil)
-      assert_equal " 1000$ CAD ", Template.parse("{{1000 | money}}").render!(nil, filters: CanadianMoneyFilter)
-      assert_equal " 1000$ CAD ", Template.parse("{{1000 | money}}").render!(nil, filters: [CanadianMoneyFilter])
+      assert_equal(" 1000$ ", Template.parse("{{1000 | money}}").render!(nil, nil))
+      assert_equal(" 1000$ CAD ", Template.parse("{{1000 | money}}").render!(nil, filters: CanadianMoneyFilter))
+      assert_equal(" 1000$ CAD ", Template.parse("{{1000 | money}}").render!(nil, filters: [CanadianMoneyFilter]))
     end
   end
 

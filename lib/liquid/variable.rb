@@ -30,7 +30,7 @@ module Liquid
       @parse_context = parse_context
       @line_number   = parse_context.line_number
 
-      parse_with_selected_parser(markup)
+      strict_parse_with_error_mode_fallback(markup)
     end
 
     def raw
@@ -63,6 +63,8 @@ module Liquid
       @filters = []
       p = Parser.new(markup)
 
+      return if p.look(:end_of_string)
+
       @name = Expression.parse(p.expression)
       while p.consume?(:pipe)
         filtername = p.consume(:id)
@@ -81,9 +83,11 @@ module Liquid
     end
 
     def render(context)
-      obj = @filters.inject(context.evaluate(@name)) do |output, (filter_name, filter_args, filter_kwargs)|
+      obj = context.evaluate(@name)
+
+      @filters.each do |filter_name, filter_args, filter_kwargs|
         filter_args = evaluate_filter_expressions(context, filter_args, filter_kwargs)
-        context.invoke(filter_name, output, *filter_args)
+        obj = context.invoke(filter_name, obj, *filter_args)
       end
 
       context.apply_global_filter(obj)

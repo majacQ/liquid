@@ -2,18 +2,23 @@
 
 module Liquid
   class TableRow < Block
-    Syntax = /(\w+)\s+in\s+(#{QuotedFragment}+)/o
+    SYNTAX = /(\w+)\s+in\s+(#{QUOTED_FRAGMENT}+)/o
 
     attr_reader :variable_name, :collection_name, :attributes
 
     def initialize(tag_name, markup, options)
       super
-      if markup =~ Syntax
+      if markup =~ SYNTAX
         @variable_name   = Regexp.last_match(1)
         @collection_name = parse_expression(Regexp.last_match(2))
         @attributes      = {}
+  <<<<<<< remove-extraneous-attributes-link-script
         markup.scan(TagAttributes) do |key, value|
           @attributes[key] = parse_expression(value)
+  =======
+        markup.scan(TAG_ATTRIBUTES) do |key, value|
+          @attributes[key] = Expression.parse(value)
+  >>>>>>> fix-constants
         end
       else
         raise SyntaxError, options[:locale].t("errors.syntax.table_row")

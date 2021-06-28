@@ -19,7 +19,6 @@ module Liquid
     prepend Tag::Disableable
 
     SYNTAX = /(#{QuotedFragment}+)(\s+(?:with|for)\s+(#{QuotedFragment}+))?(\s+(?:as)\s+(#{VariableSegment}+))?/o
-    Syntax = SYNTAX
 
     attr_reader :template_name_expr, :variable_name_expr, :attributes
 
@@ -36,8 +35,13 @@ module Liquid
         @template_name_expr = parse_expression(template_name)
         @attributes         = {}
 
+  <<<<<<< remove-extraneous-attributes-link-script
         markup.scan(TagAttributes) do |key, value|
           @attributes[key] = parse_expression(value)
+  =======
+        markup.scan(TAG_ATTRIBUTES) do |key, value|
+          @attributes[key] = Expression.parse(value)
+  >>>>>>> fix-constants
         end
 
       else

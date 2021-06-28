@@ -46,7 +46,7 @@ module Liquid
   # forloop.parentloop:: Provides access to the parent loop, if present.
   #
   class For < Block
-    Syntax = /\A(#{VariableSegment}+)\s+in\s+(#{QuotedFragment}+)\s*(reversed)?/o
+    SYNTAX = /\A(#{VARIABLE_SEGMENT}+)\s+in\s+(#{QUOTED_FRAGMENT}+)\s*(reversed)?/o
 
     attr_reader :collection_name, :variable_name, :limit, :from
 
@@ -94,6 +94,7 @@ module Liquid
     protected
 
     def lax_parse(markup)
+  <<<<<<< remove-extraneous-attributes-link-script
       if markup =~ Syntax
         @variable_name   = Regexp.last_match(1)
         collection_name  = Regexp.last_match(2)
@@ -101,6 +102,15 @@ module Liquid
         @name            = "#{@variable_name}-#{collection_name}"
         @collection_name = parse_expression(collection_name)
         markup.scan(TagAttributes) do |key, value|
+  =======
+      if markup =~ SYNTAX
+        @variable_name  = Regexp.last_match(1)
+        collection_name = Regexp.last_match(2)
+        @reversed       = !!Regexp.last_match(3)
+        @name           = "#{@variable_name}-#{collection_name}"
+        @collection_name = Expression.parse(collection_name)
+        markup.scan(TAG_ATTRIBUTES) do |key, value|
+  >>>>>>> fix-constants
           set_attribute(key, value)
         end
       else

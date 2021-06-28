@@ -24,8 +24,13 @@ module Liquid
       @for = (with_or_for == FOR)
 
       @attributes = {}
+  <<<<<<< remove-extraneous-attributes-link-script
       markup.scan(TagAttributes) do |key, value|
         @attributes[key] = parse_expression(value)
+  =======
+      markup.scan(TAG_ATTRIBUTES) do |key, value|
+        @attributes[key] = Expression.parse(value)
+  >>>>>>> fix-constants
       end
     end
 

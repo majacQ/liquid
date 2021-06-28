@@ -21,6 +21,7 @@ Lint/InheritException:
 Layout/LineLength:
   Max: 260
 
+  <<<<<<< remove-extraneous-attributes-link-script
 # Offense count: 8
 Lint/MissingSuper:
   Exclude:
@@ -52,6 +53,9 @@ Naming/ConstantName:
     - 'test/integration/tags/include_tag_test.rb'
 
 # Offense count: 2
+  =======
+# Offense count: 5
+  >>>>>>> fix-constants
 Style/ClassVars:
   Exclude:
     - 'lib/liquid/condition.rb'

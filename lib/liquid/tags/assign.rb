@@ -10,7 +10,7 @@ module Liquid
   #  {{ foo }}
   #
   class Assign < Tag
-    Syntax = /(#{VariableSignature}+)\s*=\s*(.*)\s*/om
+    SYNTAX = /(#{VARIABLE_SIGNATURE}+)\s*=\s*(.*)\s*/om
 
     # @api private
     def self.raise_syntax_error(parse_context)
@@ -21,9 +21,15 @@ module Liquid
 
     def initialize(tag_name, markup, parse_context)
       super
+  <<<<<<< remove-extraneous-attributes-link-script
       if markup =~ Syntax
         @to   = Regexp.last_match(1)
         @from = Variable.new(Regexp.last_match(2), parse_context)
+  =======
+      if markup =~ SYNTAX
+        @to = Regexp.last_match(1)
+        @from = Variable.new(Regexp.last_match(2), options)
+  >>>>>>> fix-constants
       else
         self.class.raise_syntax_error(parse_context)
       end

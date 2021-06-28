@@ -485,7 +485,11 @@ module Liquid
 
       def initialize(input, context)
         @context = context
+  <<<<<<< to-raw-value
         @input   = if input.is_a?(Array)
+  =======
+        @input = if input.is_a?(Array)
+  >>>>>>> context-drop
           input.flatten
         elsif input.is_a?(Hash)
           [input]
